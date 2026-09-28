@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>尋找你的隊輔</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;background:#f4f1ea;color:#292622}
+button,input{font:inherit}
+.app{max-width:720px;margin:auto;min-height:100vh;padding:24px 18px 48px}
+.screen{display:none}.screen.active{display:block}
+.logo{text-align:center;padding:40px 0 24px}
+.logo h1{margin:0;font-size:34px;letter-spacing:4px}.logo p{color:#777}
+.panel{background:#fff;border-radius:22px;padding:24px;box-shadow:0 8px 30px #00000012;margin-bottom:18px}
+label{display:block;margin-bottom:8px;font-weight:700}
+input{width:100%;padding:14px 16px;border:1px solid #ddd;border-radius:12px;background:#fafafa;outline:none}
+input:focus{border-color:#777}
+.btn{border:0;border-radius:12px;padding:14px 18px;cursor:pointer;font-weight:700;background:#292622;color:#fff;width:100%;margin-top:12px}
+.btn.secondary{background:#e8e3d9;color:#292622}
+.error{color:#b3261e;margin-top:10px;font-size:14px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.points{font-weight:800;font-size:18px}.points span{font-size:24px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.mystery-card{border-radius:18px;overflow:hidden;background:#24211e;aspect-ratio:1/1;cursor:pointer;position:relative}
+.mystery-card img{width:100%;height:100%;object-fit:cover;display:block}
+.card-cover{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:46px}
+.card-title{text-align:center;margin-top:8px;font-weight:700}
+.grid-title{margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.tile{aspect-ratio:1;border:0;padding:0;border-radius:8px;overflow:hidden;cursor:pointer;background:#282522;color:#fff;font-size:22px}
+.tile.locked{background:#282522}.tile.opened{cursor:default}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.code-row{display:flex;gap:8px}.code-row input{flex:1}.code-row .btn{width:auto;margin:0;white-space:nowrap}
+.history{font-size:14px;color:#666;margin-top:12px}
+.small{font-size:13px;color:#777}
+.badge{display:inline-block;padding:5px 9px;border-radius:99px;background:#eee8dd;margin:3px;font-size:12px}
+@media(max-width:480px){.app{padding:16px 12px 36px}.logo h1{font-size:28px}.panel{padding:18px}.cards{gap:10px}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<section id="loginScreen" class="screen active">
+  <div class="logo">
+    <h1>尋找你的隊輔</h1>
+    <p>Find Your Leaders</p>
+  </div>
+  <div class="panel">
+    <label for="nameInput">請輸入你的名字</label>
+    <input id="nameInput" placeholder="例如：小明" autocomplete="off">
+    <button class="btn" onclick="login()">開始遊戲</button>
+    <div id="loginError" class="error"></div>
+    <p class="small">請輸入活動名單中的姓名，系統會自動分配你的兩張神秘卡。</p>
+  </div>
+</section>
+
+<section id="gameScreen" class="screen">
+  <div class="topbar">
+    <div><strong id="playerName"></strong><div class="small" id="teamName"></div></div>
+    <div class="points">⭐ <span id="points">0</span></div>
+  </div>
+
+  <div class="panel">
+    <h2>遊戲代碼</h2>
+    <p class="small">完成關主遊戲後，輸入關主提供的代碼。勝利代碼可得 3 點，失敗代碼可得 1 點。</p>
+    <div class="code-row">
+      <input id="codeInput" placeholder="輸入代碼" autocomplete="off">
+      <button class="btn" onclick="redeemCode()">兌換</button>
+    </div>
+    <div id="codeMessage" class="error"></div>
+    <div id="history" class="history"></div>
+  </div>
+
+  <div class="panel">
+    <h2>你的神秘卡</h2>
+    <p class="small">你被分配了兩位隊輔，但系統不會直接告訴你是誰。透過遊戲取得點數，翻開照片線索找出他們。</p>
+    <div class="cards">
+      <div>
+        <div class="mystery-card" onclick="selectCard(0)"><div class="card-cover">?</div></div>
+        <div class="card-title">神秘卡 A</div>
+      </div>
+      <div>
+        <div class="mystery-card" onclick="selectCard(1)"><div class="card-cover">?</div></div>
+        <div class="card-title">神秘卡 B</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="gridPanel" class="panel" style="display:none">
+    <h2 class="grid-title" id="gridTitle"></h2>
+    <p class="small">每翻開一格消耗 1 點。已翻開的格子不會再次蓋回去。</p>
+    <div id="grid" class="grid"></div>
+    <button class="btn secondary" onclick="closeGrid()">回到我的頁面</button>
+  </div>
+
+</section>
+</div>
+
+<script>
+/* =========================
+   活動資料：之後主要修改這裡
+   ========================= */
+
+/* 72 位玩家可直接繼續新增；示範先放 16 位。
+   同一隊的玩家可以配同一組兩位隊輔。 */
+const players = {
+  "小明": {team:1, leaders:["leader01","leader02"]},
+  "小華": {team:1, leaders:["leader01","leader02"]},
+  "小美": {team:1, leaders:["leader01","leader02"]},
+  "小安": {team:2, leaders:["leader03","leader04"]},
+  "小杰": {team:2, leaders:["leader03","leader04"]},
+  "小晴": {team:2, leaders:["leader03","leader04"]},
+  "小恩": {team:3, leaders:["leader05","leader06"]},
+  "小宇": {team:3, leaders:["leader05","leader06"]},
+  "小妤": {team:3, leaders:["leader05","leader06"]},
+  "小凱": {team:4, leaders:["leader07","leader08"]},
+  "小涵": {team:4, leaders:["leader07","leader08"]},
+  "小廷": {team:4, leaders:["leader07","leader08"]},
+  "小葳": {team:5, leaders:["leader09","leader10"]},
+  "小哲": {team:5, leaders:["leader09","leader10"]},
+  "小芸": {team:5, leaders:["leader09","leader10"]},
+  "小翔": {team:6, leaders:["leader11","leader12"]}
+};
+
+/* 16 位隊輔。
+   每個隊輔有 16 張照片。
+   先用 picsum 產生測試圖；正式活動請換成你的照片路徑。 */
+const leaders = {};
+for(let i=1;i<=16;i++){
+  const id = "leader" + String(i).padStart(2,"0");
+  leaders[id] = {
+    name: "隊輔 " + String.fromCharCode(64+i),
+    photos: Array.from({length:16},(_,j)=>`https://picsum.photos/seed/${id}-${j+1}/500/500`)
+  };
+}
+
+/* 約 10 組遊戲代碼。
+   真正活動時請把這些換成你的代碼。 */
+const gameCodes = {
+  "A1X3": {game:"遊戲 01", points:3},
+  "A1X4": {game:"遊戲 01", points:1},
+  "B2Y6": {game:"遊戲 02", points:3},
+  "B2Y7": {game:"遊戲 02", points:1},
+  "C3Z8": {game:"遊戲 03", points:3},
+  "C3Z9": {game:"遊戲 03", points:1},
+  "D4K2": {game:"遊戲 04", points:3},
+  "D4K3": {game:"遊戲 04", points:1},
+  "E5M7": {game:"遊戲 05", points:3},
+  "E5M8": {game:"遊戲 05", points:1},
+  "F6N1": {game:"遊戲 06", points:3},
+  "F6N2": {game:"遊戲 06", points:1},
+  "G7P4": {game:"遊戲 07", points:3},
+  "G7P5": {game:"遊戲 07", points:1},
+  "H8Q9": {game:"遊戲 08", points:3},
+  "H8Q0": {game:"遊戲 08", points:1},
+  "J9R5": {game:"遊戲 09", points:3},
+  "J9R6": {game:"遊戲 09", points:1},
+  "K0S2": {game:"遊戲 10", points:3},
+  "K0S3": {game:"遊戲 10", points:1}
+};
+
+/* ========================= */
+
+let currentPlayer = null;
+let currentCard = null;
+let state = {};
+
+function loadState(){
+  const key = "leaderGameState";
+  state = JSON.parse(localStorage.getItem(key) || "{}");
+}
+function saveState(){
+  localStorage.setItem("leaderGameState", JSON.stringify(state));
+}
+
+function login(){
+  const name = document.getElementById("nameInput").value.trim();
+  const error = document.getElementById("loginError");
+  if(!players[name]){
+    error.textContent = "找不到這個名字，請確認輸入是否與活動名單一致。";
+    return;
+  }
+  currentPlayer = name;
+  if(!state[name]){
+    state[name] = {
+      points:0,
+      usedCodes:[],
+      opened:[[],[]]
+    };
+    saveState();
+  }
+  showGame();
+}
+
+function showGame(){
+  document.getElementById("loginScreen").classList.remove("active");
+  document.getElementById("gameScreen").classList.add("active");
+  document.getElementById("playerName").textContent = currentPlayer;
+  document.getElementById("teamName").textContent = "第 " + players[currentPlayer].team + " 隊";
+  updateUI();
+}
+
+function updateUI(){
+  const s = state[currentPlayer];
+  document.getElementById("points").textContent = s.points;
+  const history = document.getElementById("history");
+  history.innerHTML = s.usedCodes.length
+    ? "已使用代碼：" + s.usedCodes.map(x=>`<span class="badge">${x}</span>`).join("")
+    : "尚未使用任何代碼";
+}
+
+function redeemCode(){
+  const input = document.getElementById("codeInput");
+  const msg = document.getElementById("codeMessage");
+  const code = input.value.trim().toUpperCase();
+  msg.textContent = "";
+
+  if(!gameCodes[code]){
+    msg.textContent = "這不是有效的遊戲代碼。";
+    return;
+  }
+  if(state[currentPlayer].usedCodes.includes(code)){
+    msg.textContent = "這個代碼你已經使用過了。";
+    return;
+  }
+
+  const result = gameCodes[code];
+  state[currentPlayer].points += result.points;
+  state[currentPlayer].usedCodes.push(code);
+  saveState();
+
+  msg.style.color = "#2e7d32";
+  msg.textContent = `驗證成功！${result.game}：+${result.points} 點 ⭐`;
+  input.value = "";
+  updateUI();
+}
+
+function selectCard(index){
+  currentCard = index;
+  const leaderId = players[currentPlayer].leaders[index];
+  const leader = leaders[leaderId];
+
+  document.getElementById("gridPanel").style.display = "block";
+  document.getElementById("gridTitle").textContent = "神秘卡 " + (index===0?"A":"B");
+  renderGrid(leader, index);
+  document.getElementById("gridPanel").scrollIntoView({behavior:"smooth"});
+}
+
+function renderGrid(leader,index){
+  const grid = document.getElementById("grid");
+  const opened = state[currentPlayer].opened[index];
+  grid.innerHTML = "";
+
+  leader.photos.forEach((photo,i)=>{
+    const tile = document.createElement("button");
+    tile.className = "tile " + (opened.includes(i) ? "opened" : "locked");
+
+    if(opened.includes(i)){
+      tile.innerHTML = `<img src="${photo}" alt="線索 ${i+1}">`;
+    }else{
+      tile.textContent = "🔒";
+      tile.onclick = ()=>openTile(index,i,leader);
+    }
+    grid.appendChild(tile);
+  });
+}
+
+function openTile(index,i,leader){
+  if(state[currentPlayer].points <= 0){
+    alert("目前沒有點數。請先去完成遊戲取得點數！");
+    return;
+  }
+  if(state[currentPlayer].opened[index].includes(i)) return;
+
+  state[currentPlayer].points -= 1;
+  state[currentPlayer].opened[index].push(i);
+  saveState();
+  updateUI();
+  renderGrid(leader,index);
+}
+
+function closeGrid(){
+  document.getElementById("gridPanel").style.display = "none";
+  currentCard = null;
+}
+
+loadState();
+</script>
+</body>
+</html>
