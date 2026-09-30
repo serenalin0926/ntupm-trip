@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>尋找你的隊輔</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;background:#f4f1ea;color:#292622}
+button,input{font:inherit}
+.app{max-width:720px;margin:auto;min-height:100vh;padding:24px 18px 48px}
+.screen{display:none}.screen.active{display:block}
+.logo{text-align:center;padding:40px 0 24px}
+.logo h1{margin:0;font-size:34px;letter-spacing:4px}.logo p{color:#777}
+.panel{background:#fff;border-radius:22px;padding:24px;box-shadow:0 8px 30px #00000012;margin-bottom:18px}
+label{display:block;margin-bottom:8px;font-weight:700}
+input{width:100%;padding:14px 16px;border:1px solid #ddd;border-radius:12px;background:#fafafa;outline:none}
+input:focus{border-color:#777}
+.btn{border:0;border-radius:12px;padding:14px 18px;cursor:pointer;font-weight:700;background:#292622;color:#fff;width:100%;margin-top:12px}
+.btn.secondary{background:#e8e3d9;color:#292622}
+.error{color:#b3261e;margin-top:10px;font-size:14px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.points{font-weight:800;font-size:18px}.points span{font-size:24px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.mystery-card{border-radius:18px;overflow:hidden;background:#24211e;aspect-ratio:1/1;cursor:pointer;position:relative}
+.card-cover{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:46px}
+.card-title{text-align:center;margin-top:8px;font-weight:700}
+.grid-title{margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.tile{aspect-ratio:1;border:0;padding:0;border-radius:8px;overflow:hidden;cursor:pointer;background:#282522;color:#fff;font-size:22px}
+.tile.locked{background:#282522}.tile.opened{cursor:default}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.code-row{display:flex;gap:8px}.code-row input{flex:1}.code-row .btn{width:auto;margin:0;white-space:nowrap}
+.history{font-size:14px;color:#666;margin-top:12px}
+.small{font-size:13px;color:#777}
+.badge{display:inline-block;padding:5px 9px;border-radius:99px;background:#eee8dd;margin:3px;font-size:12px}
+.challenge-box{border:1px solid #e5dfd4;border-radius:16px;padding:16px;margin-top:14px}
+.money-input{display:flex;gap:8px;align-items:center}
+.money-input input{margin:0}
+.money-input span{font-weight:700;white-space:nowrap}
+.status{margin-top:10px;font-size:14px;color:#666}
+.money{font-weight:800;font-size:18px}.money span{font-size:24px}
+/* =========================================================
+   💌 初始活動幣紅包彈窗
+   ========================================================= */
+.money-popup{position:fixed;inset:0;background:rgba(0,0,0,.58);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px}
+.money-popup.show{display:flex}
+.money-envelope{width:min(340px,92vw);background:linear-gradient(145deg,#d92d25,#b71916);border-radius:24px;padding:30px 22px 24px;text-align:center;color:#fff;box-shadow:0 22px 70px rgba(0,0,0,.35);position:relative;overflow:hidden;animation:envelopeIn .35s ease-out}
+.money-envelope:before{content:"";position:absolute;inset:-60px -40px auto;height:180px;background:rgba(255,255,255,.08);transform:rotate(-12deg)}
+.money-envelope .red-seal{width:58px;height:58px;border-radius:50%;margin:0 auto 14px;background:#ffd76a;color:#a71914;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;box-shadow:0 5px 15px rgba(0,0,0,.18)}
+.money-envelope h2{margin:0;font-size:25px;position:relative}
+.money-envelope .envelope-subtitle{margin:8px 0 18px;opacity:.9;position:relative}
+.money-number{font-size:48px;font-weight:900;letter-spacing:1px;line-height:1.1;min-height:58px;position:relative;text-shadow:0 3px 10px rgba(0,0,0,.2)}
+.money-number.spinning{animation:numberPulse .09s infinite alternate}
+.money-popup-btn{margin-top:22px;border:0;border-radius:999px;padding:13px 28px;background:#fff;color:#b71916;font-weight:800;cursor:pointer;position:relative;box-shadow:0 6px 16px rgba(0,0,0,.18)}
+.money-popup-btn:disabled{opacity:.55;cursor:default}
+.money-result{font-size:15px;margin-top:8px;min-height:20px;position:relative}
+@keyframes envelopeIn{from{opacity:0;transform:scale(.88) translateY(18px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes numberPulse{from{transform:scale(1)}to{transform:scale(1.035)}}
+@media(max-width:480px){.app{padding:16px 12px 36px}.logo h1{font-size:28px}.panel{padding:18px}.cards{gap:10px}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<section id="loginScreen" class="screen active">
+  <div class="logo">
+    <h1 id="siteTitle">尋找你的隊輔</h1>
+    <p id="siteSubtitle">Find Your Leaders</p>
+  </div>
+  <div class="panel">
+    <label for="nameInput" id="nameLabel">請輸入你的名字</label>
+    <input id="nameInput" placeholder="例如：小明" autocomplete="off">
+    <button class="btn" id="startButton" onclick="login()">開始遊戲</button>
+    <div id="loginError" class="error"></div>
+    <p class="small" id="loginHint">請輸入活動名單中的姓名，系統會自動分配你的兩張神秘卡。</p>
+  </div>
+</section>
+
+<section id="gameScreen" class="screen">
+  <div class="topbar">
+    <div><strong id="playerName"></strong><div class="small" id="teamName"></div></div>
+    <div class="money">💰 <span id="money">30,000</span></div>
+  </div>
+
+  <!-- =====================================================
+       ⭐ 玩遊戲區
+       玩家先支付「挑戰費」，完成後輸入關主代碼取得固定獎勵。
+       ===================================================== -->
+  <div class="panel">
+    <h2 id="challengeTitle">🎮 玩遊戲</h2>
+    <p class="small" id="challengeDescription">先輸入本次挑戰的活動幣，再按「玩遊戲」。金額不能超過你目前的餘額。</p>
+
+    <div class="challenge-box">
+      <label for="feeInput" id="feeLabel">本次挑戰消耗</label>
+      <div class="money-input">
+        <span>$</span>
+        <input id="feeInput" type="number" min="1" step="1" inputmode="numeric">
+      </div>
+      <button class="btn" id="playButton" onclick="startChallenge()">玩遊戲</button>
+      <div id="challengeMessage" class="error"></div>
+      <div id="challengeStatus" class="status"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2 id="codeTitle"></h2>
+    <p class="small" id="codeDescription"></p>
+    <div class="code-row">
+      <input id="codeInput" autocomplete="off">
+      <button class="btn" id="redeemButton" onclick="redeemCode()"></button>
+    </div>
+    <div id="codeMessage" class="error"></div>
+    <div id="history" class="history"></div>
+  </div>
